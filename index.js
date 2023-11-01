@@ -29,7 +29,9 @@ app.get('/',(req,res,next)=>{
 })
 
 app.get('/download',async(req,res,next)=>{
+
     await ReceiveToQueue()
+    console.log(response)
     if(response.clientId!==""){
 
         const downloadResponse=await GetSvfDownload(response)  
