@@ -24,8 +24,11 @@ let fullPath=""
 const app=express()
 
 
+app.get('/',(req,res,next)=>{
+    res.send("hello world")
+})
 
-app.get('/',async(req,res,next)=>{
+app.get('/download',async(req,res,next)=>{
     await ReceiveToQueue()
     if(response.clientId!==""){
 
