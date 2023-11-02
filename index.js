@@ -40,10 +40,10 @@ app.get('/download',async(req,res,next)=>{
         const downloadResponse=await GetSvfDownload(response)  
         console.log(downloadResponse)
         if(downloadResponse!==null){
-            const urn=downloadResponse[0].substring(downloadResponse[0].indexOf("dXJu"))
-            fullPath=`${response.outputDirectory}\\${urn}`
-            console.log(fullPath)
-            //await SendToQueue(fullPath)
+            // const urn=downloadResponse[0].substring(downloadResponse[0].indexOf("dXJu"))
+            // fullPath=`${response.outputDirectory}\\${urn}`
+            // console.log(fullPath)
+            // await SendToQueue(fullPath)
             res.status(200).send("Success")
         }
             
@@ -91,8 +91,6 @@ async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=respon
         console.log(defaultPath)
         await writer.write(scene,defaultPath);
     }
-
-    return ""
    
 }
 
