@@ -74,10 +74,13 @@ async function GetSvfDownload({ clientId, clientSecret, outputDirectory, urn } =
       });
 
       const files=await reader.read()
-
+      console.log(files)
       for(const file in files){
+        console.log(file)
         const content=files[file]
+        console.log(content)
         const filePath=path.join(outputDirectory,file)
+        console.log(filePath)
         await writeFile(filePath,content)
       }
 
