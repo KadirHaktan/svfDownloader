@@ -12,7 +12,8 @@ let response={
     clientId:"",
     clientSecret:"",
     outputDirectory:"",
-    urn:""
+    urn:"",
+    subUrn:""
 }
 
 let fullPath=""
@@ -55,16 +56,16 @@ app.listen(8000,async()=>{
     console.log("starting to express...")  
 })
 
-async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=response){ 
+async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn,subUrn}=response){ 
 
 
-    const reader=await SvfReader.FromDerivativeService(urn,"",{
+    const reader=await SvfReader.FromDerivativeService(urn,subUrn,{
         client_id:clientId,
         client_secret:clientSecret
     })
 
 
-    console.log(reader)
+   console.log(reader)
    const read=reader.read()
    
    console.log(read)
