@@ -4,8 +4,8 @@
 const amqp=require('amqplib')
 const express=require('express')
 
-const {SvfDownloader,SvfReader}=require('forge-convert-utils')
-
+const {SvfDownloader,SvfReader,GltfWriter}=require('forge-convert-utils')
+const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
 
 
 let response={
@@ -37,7 +37,7 @@ app.get('/download',async(req,res,next)=>{
 
         const downloadResponse=await GetSvfDownload(response)  
         console.log(downloadResponse)
-        if(downloadResponse!==null || downloadResponse.length>0){
+        if(downloadResponse!==null){
             const urn=downloadResponse[0].substring(downloadResponse[0].indexOf("dXJu"))
             fullPath=`${response.outputDirectory}\\${urn}`
             console.log(fullPath)
@@ -56,39 +56,36 @@ app.listen(8000,async()=>{
     console.log("starting to express...")  
 })
 
-async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn,subUrn}=response){ 
+async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=response){ 
 
 
-    const reader=await SvfReader.FromDerivativeService(urn,subUrn,{
+    const modelDerivativeClient = new ModelDerivativeClient({
         client_id:clientId,
         client_secret:clientSecret
-    })
+    });
 
+    const manifestHelper = new ManifestHelper(await modelDerivativeClient.getManifest(urn));
 
-   console.log(reader)
-   const read=reader.read()
-   
-   console.log(read)
+    const derivatives = manifestHelper.search({ type: 'resource', role: 'graphics' });
+    const readerOptions = {
+        log: console.log
+    };
 
-    const downloader=new SvfDownloader({
-        client_id:clientId,
-        client_secret:clientSecret,
-        
-    })
+    const writerOptions = {
+        deduplicate: true,
+        skipUnusedUvs: true,
+        center: true,
+        log: console.log,
+        filter: (dbid) => (dbid >= 100 && dbid <= 200) // only output objects with dbIDs between 100 and 200
+    };
+    const writer = new GltfWriter(writerOptions);
+    for (const derivative of derivatives.filter(d => d.mime === 'application/autodesk-svf')) {
+        const reader = await SvfReader.FromDerivativeService(urn, derivative.guid, auth);
+        const scene = await reader.read(readerOptions);
+        await writer.write(scene, path.join(outputDirectory, derivative.guid));
+    }
 
-    let messageArray=[]
-
-    var response= downloader.download(urn,{
-        outputDir:outputDirectory,
-        log:(message)=>{
-            messageArray.push(message) 
-            
-        }
-    })
-    console.log(response)
-    await response.ready
-    console.log(messageArray)
-    return messageArray
+    return ""
    
 }
 
@@ -104,14 +101,3 @@ async function ReceiveToQueue(){
     console.log(response)
     return response
 }
-
-// async function SendToQueue(fullPath){
-//     const connection=await amqp.connect("amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi")
-//     const channel=await connection.createChannel()
-
-//     await channel.assertQueue("outputPath",{durable:false})
-//     channel.sendToQueue("outputPath",Buffer.from(fullPath))
-//     await channel.close()
-
-// }
-
