@@ -4,6 +4,8 @@
 const amqp=require('amqplib')
 const express=require('express')
 
+const path=require('path')
+
 const {SvfDownloader,SvfReader,GltfWriter}=require('forge-convert-utils')
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
 
