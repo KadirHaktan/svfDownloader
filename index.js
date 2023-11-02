@@ -1,106 +1,97 @@
 
 
 
-const amqp=require('amqplib')
-const express=require('express')
-
-const path=require('path')
-
-const {SvfDownloader,SvfReader,GltfWriter}=require('forge-convert-utils')
+const amqp = require('amqplib')
+const express = require('express')
+const path = require('path')
+const { writeFile } = require('fs/promises');
+const {SvfReader } = require('forge-convert-utils')
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
 
 
-let response={
-    clientId:"",
-    clientSecret:"",
-    outputDirectory:"",
-    urn:"",
-    subUrn:""
+let response = {
+    clientId: "",
+    clientSecret: "",
+    outputDirectory: "",
+    urn: "",
+    subUrn: ""
 }
 
-let fullPath=""
+let fullPath = ""
 
 
 
 
 
-const app=express()
+const app = express()
 
 
-app.get('/',(req,res,next)=>{
+app.get('/', (req, res, next) => {
     res.send("hello world")
 })
 
-app.get('/download',async(req,res,next)=>{
+app.get('/download', async (req, res, next) => {
 
     await ReceiveToQueue()
     console.log(response)
-    if(response.clientId!==""){
+    if (response.clientId !== "") {
 
-        const downloadResponse=await GetSvfDownload(response)  
+        const downloadResponse = await GetSvfDownload(response)
         console.log(downloadResponse)
-        if(downloadResponse!==null){
+        if (downloadResponse !== null) {
             // const urn=downloadResponse[0].substring(downloadResponse[0].indexOf("dXJu"))
             // fullPath=`${response.outputDirectory}\\${urn}`
             // console.log(fullPath)
             // await SendToQueue(fullPath)
             res.status(200).send("Success")
         }
-            
-    }else{
+
+    } else {
         console.log("Values can not get from queue yet")
 
     }
 })
 
 
-app.listen(8000,async()=>{
-    console.log("starting to express...")  
+app.listen(8000, async () => {
+    console.log("starting to express...")
 })
 
-async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=response){ 
+async function GetSvfDownload({ clientId, clientSecret, outputDirectory, urn } = response) {
 
+    const derivativeClient = new ModelDerivativeClient({ client_id: clientId, client_secret: clientSecret });
+    const manifest = await derivativeClient.getManifest(urn);
+    const helper = new ManifestHelper(manifest);
+    const derivatives = helper.search({ type: 'resource', role: 'graphics' });
+    const svf = derivatives.find(d => d.mime === 'application/autodesk-svf');
 
-    const modelDerivativeClient = new ModelDerivativeClient({
+    if (!svf) {
+        throw new Error('SVF dosyası bulunamadı');
+      }
+      const reader = await SvfReader.FromDerivativeService(urn, svf.guid,{
         client_id:clientId,
         client_secret:clientSecret
-    });
+      });
 
-    const manifestHelper = new ManifestHelper(await modelDerivativeClient.getManifest(urn));
+      const files=await reader.read()
 
-    const derivatives = manifestHelper.search({ type: 'resource', role: 'graphics' });
-    const readerOptions = {
-        log: console.log
-    };
+      for(const file in files){
+        const content=files[file]
+        const filePath=path.join(outputDirectory,file)
+        await writeFile(filePath,content)
+      }
 
-    const writerOptions = {
-        deduplicate: true,
-        skipUnusedUvs: true,
-        center: true,
-        log: console.log,
-        filter: (dbid) => (dbid >= 100 && dbid <= 200) // only output objects with dbIDs between 100 and 200
-    };
-    const writer = new GltfWriter(writerOptions);
-    for (const derivative of derivatives.filter(d => d.mime === 'application/autodesk-svf')) {
-        const reader = await SvfReader.FromDerivativeService(urn, derivative.guid,{
-            client_id:clientId,
-            client_secret:clientSecret
-        });
-        const scene = await reader.read(readerOptions);
-        const defaultPath=path.join(outputDirectory, derivative.guid)
-        console.log(defaultPath)
-        await writer.write(scene,defaultPath);
-    }
-   
+      return ""
+
 }
 
-async function ReceiveToQueue(){
-    const connection=await amqp.connect("amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi")
-    const channel=await connection.createChannel()
+async function ReceiveToQueue() {
+    const connection = await amqp.connect("amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi")
+    const channel = await connection.createChannel()
     await channel.assertQueue("svfDownloadInfo")
-    await channel.consume("svfDownloadInfo",(msg)=>{
-        response=JSON.parse(Buffer.from(msg.content,"utf-8").toString())       
-    },{noAck:false})
+    await channel.consume("svfDownloadInfo", (msg) => {
+        response = JSON.parse(Buffer.from(msg.content, "utf-8").toString())
+    }, { noAck: false })
 
     await channel.close()
     console.log(response)
