@@ -4,7 +4,7 @@
 const amqp=require('amqplib')
 const express=require('express')
 
-const {SvfDownloader, F2dDownloader}=require('forge-convert-utils')
+const {SvfDownloader,SvfReader}=require('forge-convert-utils')
 
 
 
@@ -55,43 +55,20 @@ app.listen(8000,async()=>{
     console.log("starting to express...")  
 })
 
-
-
-
-// async function GetDownload({clientId,clientSecret,outputDirectory,urn}=response){
-
-//     const decodeUrn = Buffer.from(urn, 'base64').toString("base64")
-
-//     if(decodeUrn.indexOf(".dwg")!==-1){
-//         return await GetF2dDownload(response)
-//     }
-//     else{
-//         return await GetSvfDownload(response)
-//     }
-// }
-
-// async function GetF2dDownload({clientId,clientSecret,outputDirectory,urn}=response){
-//     const downloader=new F2dDownloader({
-//         client_id:clientId,
-//         client_secret:clientSecret,
-        
-//     })
-
-//     let messageArray=[]
-
-//     var response= downloader.download(urn,{
-//         outputDir:outputDirectory,
-//         log:(message)=>{
-//             messageArray.push(message) 
-            
-//         }
-//     })
-//     await response.ready
-//     return messageArray
-// }
-
-
 async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=response){ 
+
+
+    const reader=await SvfReader.FromDerivativeService(urn,"",{
+        client_id:clientId,
+        client_secret:clientSecret
+    })
+
+
+    console.log(reader)
+   const read=reader.read()
+   
+   console.log(read)
+
     const downloader=new SvfDownloader({
         client_id:clientId,
         client_secret:clientSecret,
