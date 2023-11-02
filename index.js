@@ -87,7 +87,9 @@ async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=respon
             client_secret:clientSecret
         });
         const scene = await reader.read(readerOptions);
-        await writer.write(scene, path.join(outputDirectory, derivative.guid));
+        const path=path.join(outputDirectory, derivative.guid)
+        console.log(path)
+        await writer.write(scene,path);
     }
 
     return ""
