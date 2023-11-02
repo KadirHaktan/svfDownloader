@@ -80,7 +80,10 @@ async function GetSvfDownload({clientId,clientSecret,outputDirectory,urn}=respon
     };
     const writer = new GltfWriter(writerOptions);
     for (const derivative of derivatives.filter(d => d.mime === 'application/autodesk-svf')) {
-        const reader = await SvfReader.FromDerivativeService(urn, derivative.guid, auth);
+        const reader = await SvfReader.FromDerivativeService(urn, derivative.guid,{
+            client_id:clientId,
+            client_secret:clientSecret
+        });
         const scene = await reader.read(readerOptions);
         await writer.write(scene, path.join(outputDirectory, derivative.guid));
     }
