@@ -64,8 +64,7 @@ async function GetSvfStream({ clientId, clientSecret, urn } = response) {
    
     for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
         const defaultDerivative=derivatives[derivatives.indexOf(derivative)]
-        const guid=defaultDerivative.guid
-        const readable=await derivativeClient.getDerivativeStream(urn,encodeURI(efaultDerivative.urn))
+        const readable=await derivativeClient.getDerivativeStream(urn,encodeURI(defaultDerivative.urn))
     
         readableList.push(readable)
     }
@@ -84,6 +83,5 @@ async function ReceiveToQueue() {
     }, { noAck: false })
 
     await channel.close()
-    console.log(response)
     return response
 }
