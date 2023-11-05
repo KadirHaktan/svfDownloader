@@ -20,8 +20,6 @@ let response = {
 
 
 
-const directory=__dirname
-
 app.get('/', (req, res, next) => {
     res.send("hello world")
 })
@@ -60,7 +58,7 @@ async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = re
     const helper = new ManifestHelper(manifest);
     const derivatives = helper.search({ type: 'resource', role: 'graphics' });
 
-     urnDir+= path.join(outputDirectory|| '.', urn);
+     urnDir= path.join(outputDirectory|| '.', urn);
    
     for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
         const defaultDerivative=derivatives[parseInt(derivative)]
