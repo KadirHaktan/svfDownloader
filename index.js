@@ -6,7 +6,6 @@ const express = require('express');
 const { SvfReader } = require('forge-convert-utils');
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
 const path=require('path')
-const stream=require('stream')
 const fse=require('fs-extra')
 const app = express()
 
@@ -15,7 +14,8 @@ let urnDir=""
 let response = {
     clientId: "",
     clientSecret: "",
-    urn: ""
+    urn: "",
+    outputDirectory:""
 }
 
 
@@ -30,23 +30,13 @@ app.get('/getStream', async (req, res, next) => {
     await ReceiveToQueue()
 
     if (response.clientId !== "") {
-        // try {
             const downloadResponse = await GetSvfStream(response)
-            console.log(downloadResponse)
             if (downloadResponse !== null) {
                 console.log(downloadResponse)
                 res.status(200).send({
                     downloadResponse
                 })
             }
-        // }
-        // catch (error) {
-        //     res.status(500).send({
-        //         error
-        //     })
-        // }
-
-
     } else {
         console.log("Values can not get from queue yet")
     }
@@ -57,10 +47,8 @@ app.listen(8000, async () => {
     console.log("starting to express...")
 })
 
-async function GetSvfStream({ clientId, clientSecret, urn } = response) {
+async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = response) {
 
-    
-    let streamList=[]
 
     const derivativeClient = new ModelDerivativeClient({
         client_id: clientId,
@@ -72,7 +60,7 @@ async function GetSvfStream({ clientId, clientSecret, urn } = response) {
     const helper = new ManifestHelper(manifest);
     const derivatives = helper.search({ type: 'resource', role: 'graphics' });
 
-     urnDir+= path.join(directory || '.', urn);
+     urnDir+= path.join(outputDirectory|| '.', urn);
    
     for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
         const defaultDerivative=derivatives[parseInt(derivative)]
@@ -106,9 +94,7 @@ async function GetSvfStream({ clientId, clientSecret, urn } = response) {
        
     }
 
-    
     return urnDir
-    
    
 }
 
