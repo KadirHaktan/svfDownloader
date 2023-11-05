@@ -3,25 +3,16 @@
 
 const amqp = require('amqplib')
 const express = require('express')
-const path = require('path')
-const { writeFile } = require('fs/promises');
-const {SvfReader } = require('forge-convert-utils')
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
+
+const stream=require('stream')
 
 
 let response = {
     clientId: "",
     clientSecret: "",
-    outputDirectory: "",
-    urn: "",
-    subUrn: ""
+    urn: ""
 }
-
-let fullPath = ""
-
-
-
-
 
 const app = express()
 
@@ -30,25 +21,28 @@ app.get('/', (req, res, next) => {
     res.send("hello world")
 })
 
-app.get('/download', async (req, res, next) => {
-
+app.get('/getStream', async (req, res, next) => {
     await ReceiveToQueue()
-    console.log(response)
-    if (response.clientId !== "") {
 
-        const downloadResponse = await GetSvfDownload(response)
-        console.log(downloadResponse)
-        if (downloadResponse !== null) {
-            // const urn=downloadResponse[0].substring(downloadResponse[0].indexOf("dXJu"))
-            // fullPath=`${response.outputDirectory}\\${urn}`
-            // console.log(fullPath)
-            // await SendToQueue(fullPath)
-            res.status(200).send("Success")
+    if (response.clientId !== "") {
+        try {
+            const downloadResponse = await GetSvfStream(response)
+            if (downloadResponse !== null) {
+                console.log(downloadResponse)
+                res.send({
+                    downloadResponse
+                })
+            }
         }
+        catch (error) {
+            res.send(500).send({
+                error
+            })
+        }
+
 
     } else {
         console.log("Values can not get from queue yet")
-
     }
 })
 
@@ -57,35 +51,28 @@ app.listen(8000, async () => {
     console.log("starting to express...")
 })
 
-async function GetSvfDownload({ clientId, clientSecret, outputDirectory, urn } = response) {
+async function GetSvfStream({ clientId, clientSecret, urn } = response) {
 
-    const derivativeClient = new ModelDerivativeClient({ client_id: clientId, client_secret: clientSecret });
+    let readableList=new stream.Readable()
+    const derivativeClient = new ModelDerivativeClient({
+        client_id: clientId,
+        client_secret: clientSecret
+    });
     const manifest = await derivativeClient.getManifest(urn);
     const helper = new ManifestHelper(manifest);
     const derivatives = helper.search({ type: 'resource', role: 'graphics' });
-    const svf = derivatives.find(d => d.mime === 'application/autodesk-svf');
+   
+    for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
+        const defaultDerivative=derivatives[derivatives.indexOf(derivative)]
+        const guid=defaultDerivative.guid
+        const readable=await derivativeClient.getDerivativeStream(urn,encodeURI(efaultDerivative.urn))
+    
+        readableList.push(readable)
+    }
+    
 
-    if (!svf) {
-        throw new Error('SVF dosyası bulunamadı');
-      }
-      const reader = await SvfReader.FromDerivativeService(urn, svf.guid,{
-        client_id:clientId,
-        client_secret:clientSecret
-      });
-
-      const files=await reader.read()
-      console.log(files)
-      for(const file in files){
-        console.log(file)
-        const content=files[file]
-        console.log(content)
-        const filePath=path.join(outputDirectory,file)
-        console.log(filePath)
-        await writeFile(filePath,content)
-      }
-
-      return ""
-
+    return readableList
+   
 }
 
 async function ReceiveToQueue() {
