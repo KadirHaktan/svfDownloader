@@ -8,6 +8,8 @@ const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
 const path=require('path')
 const fse=require('fs-extra')
 const app = express()
+const archiver=require('archiver')
+
 
 let urnDir=""
 
@@ -29,11 +31,13 @@ app.get('/getStream', async (req, res, next) => {
 
     if (response.clientId !== "") {
             const downloadResponse = await GetSvfStream(response)
-            if (downloadResponse !== null) {
-                console.log(downloadResponse)
-                res.status(200).send({
-                    downloadResponse
-                })
+            if (downloadResponse) {
+                res.setHeader('Content-Type', 'application/zip');
+                res.setHeader('Content-Disposition', `attachment; filename="${response.urn}.zip"`); // İsteğe bağlı
+                downloadResponse.pipe(res); // ZIP arşivini yanıta ileterek istemciye gönderin
+            } else {
+                console.log("SVF Stream cannot be retrieved");
+                res.status(500).send("Internal Server Error");
             }
     } else {
         console.log("Values can not get from queue yet")
@@ -59,6 +63,7 @@ async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = re
     const derivatives = helper.search({ type: 'resource', role: 'graphics' });
 
      urnDir= path.join(outputDirectory|| '.', urn);
+     fse.ensureDir(urnDir)
    
     for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
         const defaultDerivative=derivatives[parseInt(derivative)]
@@ -92,7 +97,8 @@ async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = re
        
     }
 
-    return urnDir
+    const zipStream = archiver('zip');
+    return zipStream.directory(urnDir, false);
    
 }
 
