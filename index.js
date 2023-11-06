@@ -31,10 +31,11 @@ app.get('/getStream', async (req, res, next) => {
 
     if (response.clientId !== "") {
             const downloadResponse = await GetSvfStream(response)
+            console.log(downloadResponse)
             if (downloadResponse) {
-                res.setHeader('Content-Type', 'application/zip');
-                res.setHeader('Content-Disposition', `attachment; filename="${response.urn}.zip"`); // İsteğe bağlı
-                downloadResponse.pipe(res); // ZIP arşivini yanıta ileterek istemciye gönderin
+               return res.send({
+                downloadResponse
+               })
             } else {
                 console.log("SVF Stream cannot be retrieved");
                 res.status(500).send("Internal Server Error");
@@ -97,8 +98,7 @@ async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = re
        
     }
 
-    const zipStream = archiver('zip');
-    return zipStream.directory(urnDir, false);
+    return urnDir
    
 }
 
