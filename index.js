@@ -1,106 +1,114 @@
-
-
-
-const amqp = require('amqplib')
 const express = require('express');
-const { SvfReader } = require('forge-convert-utils');
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
-const path=require('path')
-const fse=require('fs-extra')
-const app = express()
-const archiver=require('archiver')
-
-
-let urnDir=""
+const { SvfReader } = require('forge-convert-utils');
+const path = require('path');
+const app = express();
+const fse = require('fs-extra');
+const { Readable } = require('stream');
+const amqp=require('amqplib')
 
 let response = {
-    clientId: "",
-    clientSecret: "",
-    urn: "",
-    outputDirectory:""
-}
-
-
+  clientId: "",
+  clientSecret: "",
+  urn: "",
+  outputDirectory: ""
+};
 
 app.get('/', (req, res, next) => {
-    res.send("hello world")
-})
+  res.send("hello world");
+});
 
 app.get('/getStream', async (req, res, next) => {
-    await ReceiveToQueue()
+  await ReceiveToQueue();
 
-    if (response.clientId !== "") {
-            const downloadResponse = await GetSvfStream(response)
-            console.log(downloadResponse)
-            if (downloadResponse) {
-               return res.send({
-                downloadResponse
-               })
-            } else {
-                console.log("SVF Stream cannot be retrieved");
-                res.status(500).send("Internal Server Error");
-            }
+  if (response.clientId !== "") {
+    const stream = mergeStreams(await GetSvfStream(response));
+
+    if (stream) {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename=output.svf');
+
+      // Stream'i yanıt olarak gönder
+      stream.pipe(res)
     } else {
-        console.log("Values can not get from queue yet")
+      console.log("SVF Stream cannot be retrieved");
+      res.status(500).send("Internal Server Error");
     }
-})
-
+  } else {
+    console.log("Values cannot be obtained from the queue yet");
+    res.status(500).send("Values cannot be obtained from the queue yet");
+  }
+});
 
 app.listen(8000, async () => {
-    console.log("starting to express...")
-})
+  console.log("Starting Express server...");
+});
 
-async function GetSvfStream({ clientId, clientSecret, urn,outputDirectory } = response) {
+async function GetSvfStream({ clientId, clientSecret, urn, outputDirectory } = response) {
+  const derivativeClient = new ModelDerivativeClient({
+    client_id: clientId,
+    client_secret: clientSecret
+  });
 
+  const manifest = await derivativeClient.getManifest(urn);
+  const helper = new ManifestHelper(manifest);
+  const derivatives = helper.search({ type: 'resource', role: 'graphics' });
+  const streams = [];
 
-    const derivativeClient = new ModelDerivativeClient({
-        client_id: clientId,
-        client_secret: clientSecret
-    });
-  
-    
-    const manifest = await derivativeClient.getManifest(urn);  
-    const helper = new ManifestHelper(manifest);
-    const derivatives = helper.search({ type: 'resource', role: 'graphics' });
-
-     urnDir= path.join(outputDirectory|| '.', urn);
-     fse.ensureDir(urnDir)
+  for (const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')) {
+    const defaultDerivative = derivatives[parseInt(derivative)];
+    const derivativeUrn = defaultDerivative.urn;
+    const derivativeGuid=defaultDerivative.guid
    
-    for(const derivative in derivatives.filter(d => d.mime === 'application/autodesk-svf')){
-        const defaultDerivative=derivatives[parseInt(derivative)]
-        const derivativeUrn=defaultDerivative.urn
-        const derivativeGuid=defaultDerivative.guid
-        const guidDir=path.join(urnDir, derivativeGuid);
-        fse.ensureDirSync(guidDir);
-        const derivativeBuffer=await derivativeClient.getDerivative(urn,encodeURI(derivativeUrn))
-        const uint8derivativeBuffer=new Uint8Array(derivativeBuffer)
-        fse.writeFileSync(path.join(guidDir, 'output.svf'),uint8derivativeBuffer);
-        const reader=await SvfReader.FromDerivativeService(urn,derivativeGuid,{
-            client_id:clientId,
-            client_secret:clientSecret
-        })
+    const derivativeBuffer = await derivativeClient.getDerivative(urn, encodeURI(derivativeUrn));
+    //const uint8derivativeBuffer = new Uint8Array(derivativeBuffer);
 
-        const manifest=await reader.getManifest()
+    streams.push(bufferToStream(derivativeBuffer))
 
-        for(const asset of manifest.assets){
-            if (!asset.URI.startsWith('embed:')) {
-                const assetData = await reader.getAsset(asset.URI);
-                const assetPath = path.join(guidDir, asset.URI);
-                const assetFolder = path.dirname(assetPath);
-                fse.ensureDirSync(assetFolder);
-                fse.writeFileSync(assetPath, assetData);
-               
-            }
-        }
+    const reader=await SvfReader.FromDerivativeService(urn,derivativeGuid,{
+        client_id:clientId,
+        client_secret:clientSecret
+    })
 
-      
+    const readerManifest=await reader.getManifest()
 
-       
+    for (const asset of readerManifest.assets) {
+      if (!asset.URI.startsWith('embed:')) {
+        const assetData = await reader.getAsset(asset.URI);
+        const assetBuffer=bufferToStream(assetData)
+        streams.push(assetBuffer);
+      }
     }
-
-    return urnDir
-   
+ 
+  }
+  return streams;
 }
+
+function bufferToStream(buffer) {
+  const stream = new Readable();
+  stream.push(buffer);
+  stream.push(null); 
+  return stream;
+}
+
+function mergeStreams(streams) {
+  const mergedStream = new Readable();
+  mergedStream._read = () => {
+    const nextStream = streams.shift();
+    if (nextStream) {
+      nextStream.on('data', (chunk) => {
+        mergedStream.push(chunk);
+      });
+      nextStream.on('end', () => {
+        mergedStream.push(null);
+      });
+    } else {
+      mergedStream.push(null);
+    }
+  };
+  return mergedStream;
+}
+
 
 async function ReceiveToQueue() {
     const connection = await amqp.connect("amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi")
