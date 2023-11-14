@@ -74,9 +74,14 @@ async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
     for (const asset of readerManifest.assets) {
       if (!asset.URI.startsWith('embed:')) {
         console.log(asset)
-        const assetData = await reader.getAsset(asset.URI);
-        console.log(assetData)
-        zip.file(asset.URI, assetData);
+        try{
+          const assetData = await reader.getAsset(asset.URI);
+          console.log(assetData)
+          zip.file(asset.URI, assetData);
+        }
+        catch(e){
+          console.log(e)
+        }   
       }
     }
   }
