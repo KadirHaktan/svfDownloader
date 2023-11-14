@@ -45,7 +45,7 @@ app.listen(8000, async () => {
   console.log('Starting Express server...');
 });
 
-async function GetSvfStream({ clientId, clientSecret, urn, outputDirectory } = response, zip) {
+async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
   const derivativeClient = new ModelDerivativeClient({
     client_id: clientId,
     client_secret: clientSecret,
@@ -69,9 +69,11 @@ async function GetSvfStream({ clientId, clientSecret, urn, outputDirectory } = r
     });
 
     const readerManifest = await reader.getManifest();
+    console.log(readerManifest.assets)
 
     for (const asset of readerManifest.assets) {
       if (!asset.URI.startsWith('embed:')) {
+        console.log(asset)
         const assetData = await reader.getAsset(asset.URI);
         console.log(assetData)
         zip.file(asset.URI, assetData);
