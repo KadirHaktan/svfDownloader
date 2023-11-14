@@ -8,8 +8,7 @@ const app = express();
 let response = {
   clientId: '',
   clientSecret: '',
-  urn: '',
-  outputDirectory: ''
+  urn: ''
 };
 
 app.get('/', (req, res, next) => {
@@ -74,6 +73,7 @@ async function GetSvfStream({ clientId, clientSecret, urn, outputDirectory } = r
     for (const asset of readerManifest.assets) {
       if (!asset.URI.startsWith('embed:')) {
         const assetData = await reader.getAsset(asset.URI);
+        console.log(assetData)
         zip.file(asset.URI, assetData);
       }
     }
@@ -92,5 +92,6 @@ async function ReceiveToQueue() {
   }, { noAck: false });
 
   await channel.close();
+  console.log(response)
   return response;
 }
