@@ -1,14 +1,17 @@
 const express = require('express');
 const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
-const { SvfReader } = require('forge-convert-utils');
+const { SvfReader,F2dDownloader } = require('forge-convert-utils');
 const amqp = require('amqplib');
 const JSZip = require('jszip');
 const app = express();
 
+const zlib=require('zlib')
+
 let response = {
   clientId: '',
   clientSecret: '',
-  urn: ''
+  urn: '',
+  fileType:''
 };
 
 app.get('/', (req, res, next) => {
@@ -20,10 +23,16 @@ app.get('/getStream', async (req, res, next) => {
 
   if (response.clientId !== '') {
     const zip = new JSZip();
-    
-    const streams = await GetSvfStream(response, zip);
 
-    console.log(streams)
+    let streams=null
+
+    if(response.fileType==="dwg"){
+      streams=await GetF2DStrem(response,zip)
+    }
+
+    else{
+      streams = await GetSvfStream(response, zip);
+    } 
 
     if (streams!==null) {
       zip.generateAsync({ type: 'nodebuffer' }).then((zipData) => {
@@ -44,6 +53,48 @@ app.get('/getStream', async (req, res, next) => {
 app.listen(8000, async () => {
   console.log('Starting Express server...');
 });
+
+
+async function GetF2DStrem({clientId,clientSecret,urn}=response,zip){
+  const derivativeClient = new ModelDerivativeClient({
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+
+  const manifest = await derivativeClient.getManifest(urn);
+  const helper = new ManifestHelper(manifest);
+  const derivatives = helper.search({ type: 'resource', role: 'graphics' });
+  for (const derivative of derivatives.filter(d => d.mime === 'application/autodesk-f2d')) {
+    const baseUrn = derivative.urn.substr(0, derivative.urn.lastIndexOf('/'));
+    const secondBaseUrn = baseUrn + '/manifest.json.gz'
+
+
+    const derivativeBuffer = await derivativeClient.getDerivative(urn, encodeURI(secondBaseUrn));
+    zip.file('manifest.json.gz', derivativeBuffer);
+
+    const manfiestGzip = zlib.gunzipSync(derivativeBuffer)
+    const manifest = JSON.parse(manfiestGzip.toString())
+
+    for (const asset in manifest.assets) {
+      try {
+        const preventAsset = manifest.assets[asset]
+        const uri = preventAsset.URI
+        const thirdBaseUrn = baseUrn + '/' + uri
+        const assetData = await derivativeClient.getDerivative(urn, encodeURI(thirdBaseUrn));
+        zip.file(uri, assetData)
+      } catch (err) {
+        if (context.failOnMissingAssets) {
+          throw err;
+        } else {
+          context.log(`Could not download asset ${asset.URI}`);
+        }
+      }
+    }
+
+  }
+
+  return zip
+}
 
 async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
   const derivativeClient = new ModelDerivativeClient({
