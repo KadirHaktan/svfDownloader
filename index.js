@@ -19,6 +19,7 @@ app.get('/', (req, res, next) => {
 });
 
 app.get('/getStream', async (req, res, next) => {
+
   await ReceiveToQueue();
 
   if (response.clientId !== '') {
@@ -34,6 +35,7 @@ app.get('/getStream', async (req, res, next) => {
       streams = await GetSvfStream(response, zip);
     } 
 
+    console.log(streams)
     if (streams!==null) {
       zip.generateAsync({ type: 'nodebuffer' }).then((zipData) => {
         res.setHeader('Content-Type', 'application/zip');
@@ -140,16 +142,22 @@ async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
 }
 
 async function ReceiveToQueue() {
-  const connection = await amqp.connect(
-    'amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi'
-  );
-  const channel = await connection.createChannel();
-  await channel.assertQueue('svfDownloadInfo');
-  await channel.consume('svfDownloadInfo', (msg) => {
-    response = JSON.parse(Buffer.from(msg.content, 'utf-8').toString());
-  }, { noAck: false });
-
-  await channel.close();
-  console.log(response)
-  return response;
+  try{
+    const connection = await amqp.connect(
+      'amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi'
+    );
+    const channel = await connection.createChannel();
+    await channel.assertQueue('svfDownloadInfo');
+    await channel.consume('svfDownloadInfo', (msg) => {
+      response = JSON.parse(Buffer.from(msg.content, 'utf-8').toString());
+    }, { noAck: false });
+  
+    await channel.close();
+    console.log(response)
+    return response;
+  }
+  catch(error){
+    console.log(error)
+  }
+ 
 }
