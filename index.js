@@ -10,6 +10,11 @@ const path=require('path');
 
 const zlib=require('zlib')
 
+const { AbortController } = require('abort-controller');
+
+global.AbortController = AbortController;
+
+
 let response = {
   clientId: '',
   clientSecret: '',
