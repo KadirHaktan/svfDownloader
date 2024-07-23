@@ -96,9 +96,7 @@ async function GetF2DStrem({clientId,clientSecret,urn}=response,zip){
         }
       }
     }
-
   }
-
   return zip
 }
 
