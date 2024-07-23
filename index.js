@@ -1,9 +1,12 @@
 const express = require('express');
-const { ModelDerivativeClient, ManifestHelper } = require('forge-server-utils');
-const { SvfReader,F2dDownloader } = require('forge-convert-utils');
+const {ModelDerivativeClient,ManifestHelper} = require('aps-sdk-node')
+const { SvfReader,F2dDownloader, BasicAuthenticationProvider } = require('svf-utils');
 const amqp = require('amqplib');
 const JSZip = require('jszip');
 const app = express();
+const model_derivative_1 = require("@aps_sdk/model-derivative");
+const authentication_1 = require("@aps_sdk/authentication");
+const path=require('path');
 
 const zlib=require('zlib')
 
@@ -11,7 +14,8 @@ let response = {
   clientId: '',
   clientSecret: '',
   urn: '',
-  fileType:''
+  fileType:'',
+  accessToken:''
 };
 
 app.get('/', (req, res, next) => {
@@ -98,7 +102,7 @@ async function GetF2DStrem({clientId,clientSecret,urn}=response,zip){
   return zip
 }
 
-async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
+async function GetSvfStream({ clientId, clientSecret, urn,accessToken} = response, zip) {
   const derivativeClient = new ModelDerivativeClient({
     client_id: clientId,
     client_secret: clientSecret,
@@ -116,10 +120,8 @@ async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
     const derivativeBuffer = await derivativeClient.getDerivative(urn, encodeURI(derivativeUrn));
     zip.file('output.svf', derivativeBuffer);
 
-    const reader = await SvfReader.FromDerivativeService(urn, derivativeGuid, {
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
+    const provider=new BasicAuthenticationProvider(accessToken)
+    const reader = await SvfReader.FromDerivativeService(urn, derivativeGuid,provider);
 
     const readerManifest = await reader.getManifest();
     console.log(readerManifest.assets)
@@ -128,8 +130,11 @@ async function GetSvfStream({ clientId, clientSecret, urn} = response, zip) {
       if (!asset.URI.startsWith('embed:')) {
         console.log(asset)
         try{
-          const assetData = await reader.getAsset(asset.URI);
-          console.log(assetData)
+          // const assetData = await reader.getAsset(asset.URI)
+          // console.log(assetData)
+          const baseUri = derivativeUrn.substr(0, derivativeUrn.lastIndexOf('/'));
+          const fullUri=path.join(baseUri, asset.URI)
+          const assetData=await derivativeClient.getDerivative(urn,fullUri)
           zip.file(asset.URI, assetData);
         }
         catch(e){
