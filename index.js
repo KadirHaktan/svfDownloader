@@ -27,12 +27,6 @@ app.get('/getStream', async (req, res, next) => {
 
   await ReceiveToQueue();
 
-  //var clientInfos = await GetClientIdAndSecret()
-
-
-  // response.clientId = response.clientId === '' ? clientInfos.clientId : response.clientId
-  // response.clientSecret = clientInfos.clientSecret === '' ? clientInfos.clientSecret : clientInfos.clientSecret
-
   if (response.clientId !== '') {
     const zip = new JSZip();
 
