@@ -1,15 +1,11 @@
 const express = require('express');
-const {ModelDerivativeClient,ManifestHelper} = require('aps-sdk-node')
-const { SvfReader,F2dDownloader, BasicAuthenticationProvider } = require('svf-utils');
+const { ModelDerivativeClient, ManifestHelper } = require('aps-sdk-node')
+const { SvfReader, F2dDownloader, BasicAuthenticationProvider } = require('svf-utils');
 const amqp = require('amqplib');
 const JSZip = require('jszip');
 const app = express();
-const model_derivative_1 = require("@aps_sdk/model-derivative");
-const authentication_1 = require("@aps_sdk/authentication");
-const path=require('path');
-
-const zlib=require('zlib')
-
+const path = require('path');
+const zlib = require('zlib')
 const { AbortController } = require('abort-controller');
 
 global.AbortController = AbortController;
@@ -19,8 +15,8 @@ let response = {
   clientId: '',
   clientSecret: '',
   urn: '',
-  fileType:'',
-  accessToken:''
+  fileType: '',
+  accessToken: ''
 };
 
 app.get('/', (req, res, next) => {
@@ -31,21 +27,27 @@ app.get('/getStream', async (req, res, next) => {
 
   await ReceiveToQueue();
 
+  //var clientInfos = await GetClientIdAndSecret()
+
+
+  // response.clientId = response.clientId === '' ? clientInfos.clientId : response.clientId
+  // response.clientSecret = clientInfos.clientSecret === '' ? clientInfos.clientSecret : clientInfos.clientSecret
+
   if (response.clientId !== '') {
     const zip = new JSZip();
 
-    let streams=null
+    let streams = null
 
-    if(response.fileType==="dwg"){
-      streams=await GetF2DStrem(response,zip)
+    if (response.fileType === "dwg") {
+      streams = await GetF2DStrem(response, zip)
     }
 
-    else{
+    else {
       streams = await GetSvfStream(response, zip);
-    } 
+    }
 
     console.log(streams)
-    if (streams!==null) {
+    if (streams !== null) {
       zip.generateAsync({ type: 'nodebuffer' }).then((zipData) => {
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename=${response.urn}.zip`);
@@ -66,7 +68,7 @@ app.listen(8000, async () => {
 });
 
 
-async function GetF2DStrem({clientId,clientSecret,urn}=response,zip){
+async function GetF2DStrem({ clientId, clientSecret, urn } = response, zip) {
   const derivativeClient = new ModelDerivativeClient({
     client_id: clientId,
     client_secret: clientSecret,
@@ -105,7 +107,7 @@ async function GetF2DStrem({clientId,clientSecret,urn}=response,zip){
   return zip
 }
 
-async function GetSvfStream({ clientId, clientSecret, urn,accessToken} = response, zip) {
+async function GetSvfStream({ clientId, clientSecret, urn, accessToken } = response, zip) {
   const derivativeClient = new ModelDerivativeClient({
     client_id: clientId,
     client_secret: clientSecret,
@@ -123,8 +125,8 @@ async function GetSvfStream({ clientId, clientSecret, urn,accessToken} = respons
     const derivativeBuffer = await derivativeClient.getDerivative(urn, encodeURI(derivativeUrn));
     zip.file('output.svf', derivativeBuffer);
 
-    const provider=new BasicAuthenticationProvider(accessToken)
-    const reader = await SvfReader.FromDerivativeService(urn, derivativeGuid,provider);
+    const provider = new BasicAuthenticationProvider(accessToken)
+    const reader = await SvfReader.FromDerivativeService(urn, derivativeGuid, provider);
 
     const readerManifest = await reader.getManifest();
     console.log(readerManifest.assets)
@@ -132,17 +134,17 @@ async function GetSvfStream({ clientId, clientSecret, urn,accessToken} = respons
     for (const asset of readerManifest.assets) {
       if (!asset.URI.startsWith('embed:')) {
         console.log(asset)
-        try{
+        try {
           // const assetData = await reader.getAsset(asset.URI)
           // console.log(assetData)
           const baseUri = derivativeUrn.substr(0, derivativeUrn.lastIndexOf('/'));
-          const fullUri=path.join(baseUri, asset.URI)
-          const assetData=await derivativeClient.getDerivative(urn,fullUri)
+          const fullUri = path.join(baseUri, asset.URI)
+          const assetData = await derivativeClient.getDerivative(urn, fullUri)
           zip.file(asset.URI, assetData);
         }
-        catch(e){
+        catch (e) {
           console.log(e)
-        }   
+        }
       }
     }
   }
@@ -150,7 +152,7 @@ async function GetSvfStream({ clientId, clientSecret, urn,accessToken} = respons
 }
 
 async function ReceiveToQueue() {
-  try{
+  try {
     const connection = await amqp.connect(
       'amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi'
     );
@@ -159,13 +161,13 @@ async function ReceiveToQueue() {
     await channel.consume('svfDownloadInfo', (msg) => {
       response = JSON.parse(Buffer.from(msg.content, 'utf-8').toString());
     }, { noAck: false });
-  
+
     await channel.close();
     console.log(response)
     return response;
   }
-  catch(error){
+  catch (error) {
     console.log(error)
   }
- 
+
 }
