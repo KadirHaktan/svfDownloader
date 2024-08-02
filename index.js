@@ -19,13 +19,20 @@ let response = {
   accessToken: ''
 };
 
+
+app.use(express.json());
+
 app.get('/', (req, res, next) => {
   res.send('Hello World');
 });
 
-app.get('/getStream', async (req, res, next) => {
 
-  await ReceiveToQueue();
+
+app.post('/getStream', async (req, res, next) => {
+
+ // await ReceiveToQueue();
+
+   response=req.body
 
   if (response.clientId !== '') {
     const zip = new JSZip();
@@ -145,23 +152,23 @@ async function GetSvfStream({ clientId, clientSecret, urn, accessToken } = respo
   return zip
 }
 
-async function ReceiveToQueue() {
-  try {
-    const connection = await amqp.connect(
-      'amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi'
-    );
-    const channel = await connection.createChannel();
-    await channel.assertQueue('svfDownloadInfo');
-    await channel.consume('svfDownloadInfo', (msg) => {
-      response = JSON.parse(Buffer.from(msg.content, 'utf-8').toString());
-    }, { noAck: false });
+// async function ReceiveToQueue() {
+//   try {
+//     const connection = await amqp.connect(
+//       'amqps://asylnloi:X0SDax_OxfphJtZlP4WEMkSlKvC6ShWr@sparrow.rmq.cloudamqp.com/asylnloi'
+//     );
+//     const channel = await connection.createChannel();
+//     await channel.assertQueue('svfDownloadInfo');
+//     await channel.consume('svfDownloadInfo', (msg) => {
+//       response = JSON.parse(Buffer.from(msg.content, 'utf-8').toString());
+//     }, { noAck: false });
 
-    await channel.close();
-    console.log(response)
-    return response;
-  }
-  catch (error) {
-    console.log(error)
-  }
+//     await channel.close();
+//     console.log(response)
+//     return response;
+//   }
+//   catch (error) {
+//     console.log(error)
+//   }
 
-}
+// }
